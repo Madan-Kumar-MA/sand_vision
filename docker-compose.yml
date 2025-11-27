@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Frontend (Nginx or Python http.server)
+  frontend:
+    image: node:16-alpine
+    container_name: sandvision-frontend
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: npx http-server -p 8000 -c-1
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://backend:5000
+    networks:
+      - sandvision-network
+
+  # Backend (Flask API)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sandvision-backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - backend-uploads:/app/uploads
+      - backend-models:/app/models
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DATABASE_URL=sqlite:///sandvision.db
+      - CORS_ORIGINS=*
+    command: python app.py
+    networks:
+      - sandvision-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (Optional - for production)
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: sandvision-db
+  #   environment:
+  #     - POSTGRES_USER=sandvision
+  #     - POSTGRES_PASSWORD=sandvision-password
+  #     - POSTGRES_DB=sandvision
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - sandvision-network
+
+volumes:
+  backend-uploads:
+  backend-models:
+  # postgres-data:
+
+networks:
+  sandvision-network:
+    driver: bridge

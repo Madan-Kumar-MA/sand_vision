@@ -1,8 +1,3 @@
-"""
-Requirements for SandVision Backend
-Install with: pip install -r requirements.txt
-"""
-
 # Web Framework
 Flask==2.3.0
 Flask-CORS==4.0.0
@@ -11,7 +6,7 @@ Werkzeug==2.3.0
 
 # Database
 SQLAlchemy==2.0.19
-psycopg2-binary==2.9.6  # PostgreSQL driver (optional)
+
 
 # Image Processing
 opencv-python==4.8.0.74
