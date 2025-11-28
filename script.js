@@ -182,42 +182,55 @@ document.addEventListener("DOMContentLoaded", () => {
       capturedImageData = imageData;
       isCaptured = true;
 
-      // Auto-analyze on image selection
-      captureBtn.onclick = async () => {
-        await analyzeImage(imageData, file.name);
-      };
+      // Auto-analyze on image selection immediately (no delay)
+      analyzeImage(imageData, file.name).catch(err => console.error(err));
     }
 
     // Analyze Image function
     async function analyzeImage(imageData, filename) {
       try {
         imageInfo.textContent = "Analyzing image...";
-        
+        // Quick connectivity check to backend
+        await pingBackend();
+
         // Convert base64 to blob
         const blob = dataURLtoBlob(imageData);
         const formData = new FormData();
         formData.append('image', blob, filename);
 
-        const response = await fetch(`${API_URL}/api/analyze`, {
-          method: 'POST',
-          body: formData
-        });
+        let response;
+        try {
+          response = await fetch(`${API_URL}/api/analyze`, {
+            method: 'POST',
+            body: formData,
+            mode: 'cors'
+          });
+        } catch (netErr) {
+          console.error('Network error during fetch:', netErr);
+          throw new Error(`Network error when contacting backend at ${API_URL}: ${netErr.message || netErr}`);
+        }
 
         if (!response.ok) {
-          throw new Error(`Analysis failed: ${response.statusText}`);
+          const text = await response.text().catch(() => null);
+          throw new Error(`Analysis failed: ${response.status} ${response.statusText} ${text ? '- ' + text : ''}`);
         }
 
         const result = await response.json();
         
-        // Backend returns { id, filename, results: { ... } }
+        // Backend returns { id, filename, results: { ... } } or error
+        if (result && result.error) {
+          // Show error message prominently and keep modal open
+          imageInfo.textContent = `❌ Error: ${result.error}`;
+          console.error('Backend error:', result.error);
+          return; // Stop here, don't navigate away
+        }
+
         if (result && result.results) {
           showAnalysisResults(result.results);
           // Optionally save a lightweight local cache of the result
           saveAnalysisLocally({ id: result.id, filename: result.filename, results: result.results });
-          // After successful analysis, navigate to the analysis page so user can see full history
-          setTimeout(() => loadPage('analysis.html'), 600);
-        } else if (result && result.error) {
-          throw new Error(result.error);
+          // After successful analysis, navigate to the analysis page so user can see full history (longer delay)
+          setTimeout(() => loadPage('analysis.html'), 2000);
         } else {
           throw new Error('Analysis failed: unexpected response');
         }
@@ -225,6 +238,25 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (error) {
         imageInfo.textContent = `Error: ${error.message}`;
         console.error('Analysis error:', error);
+        // Helpful hint for the user when fetch fails
+        if (error.message && (error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('failed to fetch') || error.message.toLowerCase().includes('connection'))) {
+          imageInfo.textContent += ' — Please ensure the backend is running at ' + API_URL + ' and CORS is enabled.';
+        }
+      }
+    }
+
+    // Ping backend with timeout to ensure it's reachable
+    async function pingBackend(timeoutMs = 5000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(`${API_URL}/`, { method: 'GET', mode: 'cors', signal: controller.signal });
+        clearTimeout(id);
+        if (!res.ok) throw new Error(`Backend responded with ${res.status}`);
+        return true;
+      } catch (err) {
+        clearTimeout(id);
+        throw err;
       }
     }
 

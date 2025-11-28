@@ -9,9 +9,17 @@ import os
 import sqlite3
 import json
 from datetime import datetime
+# Optional image analysis imports
+try:
+    import cv2
+    import numpy as np
+    CV2_AVAILABLE = True
+except Exception:
+    cv2 = None
+    np = None
+    CV2_AVAILABLE = False
 from werkzeug.utils import secure_filename
 import traceback
-
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
@@ -98,6 +106,71 @@ def analyze_image():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().timestamp()}_{filename}")
         file.save(filepath)
         
+        # If OpenCV available, detect faces first and reject images with people
+        def detect_faces(path):
+            """Return number of faces detected in the image (requires OpenCV)."""
+            if not CV2_AVAILABLE:
+                return 0
+            img = cv2.imread(path)
+            if img is None:
+                return 0
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            try:
+                face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                return 0 if faces is None else len(faces)
+            except Exception:
+                return 0
+        
+        faces_found = detect_faces(filepath)
+        if faces_found > 0:
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+            return jsonify({'error': 'Image contains human face(s); please upload a sand sample', 'faces': faces_found}), 400
+
+        # If OpenCV available, perform a quick sand-detection heuristic
+        def detect_sand(path, threshold=0.10):
+            """Return (is_sand: bool, sand_ratio: float). Simple HSV color mask."""
+            if not CV2_AVAILABLE:
+                return (True, 1.0)  # fallback: assume sand if cv2 not available
+
+            img = cv2.imread(path)
+            if img is None:
+                return (False, 0.0)
+
+            # Resize for faster processing while preserving ratio
+            h, w = img.shape[:2]
+            max_dim = 800
+            if max(h, w) > max_dim:
+                scale = max_dim / float(max(h, w))
+                img = cv2.resize(img, (int(w*scale), int(h*scale)))
+
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+            # Heuristic HSV ranges for sand/beige colors (tunable)
+            # H: ~5-40, S: low-to-mid, V: mid-to-high
+            lower = np.array([5, 20, 140], dtype=np.uint8)
+            upper = np.array([40, 150, 255], dtype=np.uint8)
+
+            mask = cv2.inRange(hsv, lower, upper)
+            sand_pixels = int(np.count_nonzero(mask))
+            total_pixels = img.shape[0] * img.shape[1]
+            sand_ratio = sand_pixels / float(total_pixels) if total_pixels > 0 else 0.0
+
+            return (sand_ratio >= threshold, sand_ratio)
+
+        is_sand, sand_ratio = detect_sand(filepath, threshold=0.10)
+
+        if not is_sand:
+            # remove saved file (not useful) and return an error to client
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+            return jsonify({'error': 'Image does not appear to contain sand', 'sand_ratio': round(sand_ratio, 4)}), 400
+
         # Mock analysis (replace with actual processing)
         import random
         fine = round(random.uniform(20, 40), 2)
