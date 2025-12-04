@@ -6,6 +6,8 @@
   <title>SandVision - Beach Sand Grain Mapping System</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
 <body>
   <header>
@@ -14,12 +16,18 @@
         <div class="logo-icon">S</div>
         <span>SandVision</span>
       </div>
-      <nav>
+      <button id="menuToggle" class="menu-toggle" style="display:none;background:none;border:none;color:var(--white);cursor:pointer;font-size:1.5rem;padding:0;">
+        <i class="fas fa-bars"></i>
+      </button>
+      <nav id="navMenu">
         <a href="#" class="active" data-page="home.html"><i class="fas fa-home"></i> Home</a>
         <a href="#" data-page="live-capture.html"><i class="fas fa-video"></i> Live Capture</a>
         <a href="#" data-page="analysis.html"><i class="fas fa-chart-bar"></i> Analysis</a>
         <a href="#" data-page="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
         <a href="#" data-page="download.html"><i class="fas fa-download"></i> Download</a>
+        <button id="themeToggle" style="background:none;border:none;color:var(--white);cursor:pointer;font-size:1.2rem;margin-left:20px;padding:0;transition:transform 0.3s;" title="Toggle dark/light theme">
+          <i class="fas fa-moon"></i>
+        </button>
       </nav>
     </div>
   </header>
@@ -50,6 +58,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="script.js"></script>
+  <!-- cache-bust script to ensure latest behavior is loaded -->
+  <script src="script.js?v=4"></script>
 </body>
 </html>
